@@ -7,64 +7,88 @@ const PORT = process.env.PORT || 4000;
 const SECRET = process.env.SECRET_TOKEN;
 
 if (!SECRET) {
-  throw new Error('SECRET_TOKEN is not set');
+  throw new Error('SECRET_TOKEN is not set in environment');
 }
 
 /**
- * IMPORTANT:
- * Capture RAW BODY as STRING EXACTLY ONCE
+ * We only need query/body parsing now
  */
-app.use('/deploy', express.raw({ type: '*/*' }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-function verifySignature(req) {
-  const signature = req.headers['x-hub-signature-256'];
-  if (!signature || !req.body) return false;
+/**
+ * Constant-time comparison to avoid trivial timing attacks
+ */
+function safeEqual(a, b) {
+  const aBuf = Buffer.from(String(a));
+  const bBuf = Buffer.from(String(b));
 
-  // Convert Buffer -> string ONCE (GitHub signs this exact UTF-8 string)
-  const payload = req.body.toString('utf8');
-
-  const hmac = crypto.createHmac('sha256', SECRET);
-  const digest = hmac.update(payload, 'utf8').digest('hex');
-
-  const expected = signature.split('=')[1];
-
-  if (!expected) return false;
-
-  // DIRECT STRING COMPARISON (THIS IS THE KEY FIX)
-  return crypto.timingSafeEqual(
-    Buffer.from(digest, 'utf8'),
-    Buffer.from(expected, 'utf8')
-  );
+  if (aBuf.length !== bBuf.length) return false;
+  return crypto.timingSafeEqual(aBuf, bBuf);
 }
 
+/**
+ * Simple auth check
+ */
+function verifyRequest(req) {
+  const secret = req.query.secret || req.body?.secret;
+
+  if (!secret) return false;
+
+  return safeEqual(secret, SECRET);
+}
+
+/**
+ * Deploy logic
+ */
 function deploy(project) {
   console.log(`[DEPLOY] ${project}`);
 
-  execSync(`/usr/local/bin/deploy-project.sh ${project}`, {
-    stdio: 'inherit'
-  });
+  try {
+    execSync(`/usr/local/bin/deploy-project.sh ${project}`, {
+      stdio: 'inherit'
+    });
 
-  console.log(`[DONE] ${project}`);
+    console.log(`[DONE] ${project}`);
+  } catch (err) {
+    console.error(`[DEPLOY FAILED] ${project}`, err.message);
+    throw err;
+  }
 }
 
+/**
+ * Webhook endpoint
+ */
 app.post('/deploy', (req, res) => {
-  const project = req.query.project;
+  try {
+    const project = req.query.project;
 
-  if (!project) {
-    return res.status(400).json({ error: 'Missing project' });
+    if (!project) {
+      return res.status(400).json({ error: 'Missing project' });
+    }
+
+    if (!verifyRequest(req)) {
+      return res.status(403).json({ error: 'Invalid secret' });
+    }
+
+    deploy(project);
+
+    return res.json({
+      ok: true,
+      deployed: project
+    });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: err.message });
   }
+});
 
-  if (req.headers['x-github-event'] === 'ping') {
-    return res.json({ ok: true });
-  }
-
-  if (!verifySignature(req)) {
-    return res.status(403).json({ error: 'Invalid signature' });
-  }
-
-  deploy(project);
-
-  res.json({ ok: true, deployed: project });
+/**
+ * Health check
+ */
+app.get('/health', (req, res) => {
+  res.json({ ok: true });
 });
 
 app.listen(PORT, () => {
