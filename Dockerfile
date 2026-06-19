@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY package.json ./
 RUN npm install
-RUN apk add --no-cache git
+RUN apk add --no-cache git openssh-client
 
 RUN git config --global --add safe.directory '*'
 
