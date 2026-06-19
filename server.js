@@ -3,17 +3,37 @@ const { execSync } = require('child_process');
 const crypto = require('crypto');
 require('dotenv').config();
 
+const SECRET = process.env.SECRET_TOKEN;
+
 const app = express();
-app.use(express.json({
-  verify: (req, res, buf) => {
-    req.rawBody = buf.toString();
-  }
-}));
+app.use((req, res, next) => {
+  let data = '';
+
+  req.on('data', chunk => {
+    data += chunk;
+  });
+
+  req.on('end', () => {
+    req.rawBody = data;
+
+    try {
+      req.body = JSON.parse(data || '{}');
+    } catch {
+      req.body = {};
+    }
+
+    next();
+  });
+});
 
 const SECRET = process.env.SECRET_TOKEN;
 const PORT = process.env.PORT || 4000;
 
 function deploy(project) {
+  if (!verifyGitHubSignature(req)) {
+    return res.status(403).json({ error: "Invalid signature" });
+  }
+  
   const path = "/home/kikchan/Metalforce/" + project;
 
   if (!path) {
@@ -29,12 +49,11 @@ function deploy(project) {
   console.log(`[DONE] ${project}`);
 }
 
-function verifyGitHubSignature(req, secret) {
+function verifyGitHubSignature(req) {
   const signature = req.headers['x-hub-signature-256'];
+  if (!signature || !req.rawBody) return false;
 
-  if (!signature) return false;
-
-  const hmac = crypto.createHmac('sha256', secret);
+  const hmac = crypto.createHmac('sha256', SECRET);
   const digest = 'sha256=' + hmac.update(req.rawBody).digest('hex');
 
   return crypto.timingSafeEqual(
