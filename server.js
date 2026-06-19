@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const { execSync } = require('child_process');
 
 const app = express();
-const PORT = 4000;
+const PORT = process.env.PORT || 4000;
 const SECRET = process.env.SECRET_TOKEN;
 
 app.use(express.json({
