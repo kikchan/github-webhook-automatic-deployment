@@ -22,17 +22,19 @@ app.use('/deploy', express.raw({ type: '*/*' }));
  */
 function verifySignature(req) {
   const signature = req.headers['x-hub-signature-256'];
-
   if (!signature || !req.body) return false;
 
   const hmac = crypto.createHmac('sha256', SECRET);
-  const digest =
-    'sha256=' + hmac.update(req.body).digest('hex');
+  const digest = hmac.update(req.body).digest('hex');
 
-  const sigBuf = Buffer.from(signature, 'utf8');
-  const digestBuf = Buffer.from(digest, 'utf8');
+  // GitHub sends: "sha256=..."
+  const expected = signature.split('=')[1];
 
-  // Prevent timing attacks AND length mismatch crashes
+  if (!expected) return false;
+
+  const digestBuf = Buffer.from(digest, 'hex');
+  const sigBuf = Buffer.from(expected, 'hex');
+
   if (sigBuf.length !== digestBuf.length) return false;
 
   return crypto.timingSafeEqual(sigBuf, digestBuf);
