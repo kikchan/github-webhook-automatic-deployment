@@ -6,7 +6,7 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const SECRET = process.env.SECRET_TOKEN;
 
-app.use(express.raw({ type: '*/*' }));
+app.use(express.raw({ type: 'application/json' }));
 
 function getRawBody(req) {
   return req.body.toString('utf8');
