@@ -1,9 +1,14 @@
 const express = require('express');
 const { execSync } = require('child_process');
+const crypto = require('crypto');
 require('dotenv').config();
 
 const app = express();
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString();
+  }
+}));
 
 const SECRET = process.env.SECRET_TOKEN;
 const PORT = process.env.PORT || 4000;
@@ -24,6 +29,20 @@ function deploy(project) {
   console.log(`[DONE] ${project}`);
 }
 
+function verifyGitHubSignature(req, secret) {
+  const signature = req.headers['x-hub-signature-256'];
+
+  if (!signature) return false;
+
+  const hmac = crypto.createHmac('sha256', secret);
+  const digest = 'sha256=' + hmac.update(req.rawBody).digest('hex');
+
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(digest)
+  );
+}
+
 /**
  * GitHub webhook (query string based)
  * Example:
@@ -32,14 +51,17 @@ function deploy(project) {
 app.post('/deploy', (req, res) => {
   try {
     const project = req.query.project;
-    const secret = req.body.config.secret;
+
+    if (req.headers['x-github-event'] === 'ping') {
+      return res.json({ ok: true, message: "pong" });
+    }
 
     if (!project) {
       return res.status(400).json({ error: "Missing ?project=" });
     }
 
-    if (secret !== SECRET) {
-      return res.status(403).json({ error: "Forbidden" });
+    if (!verifyGitHubSignature(req, SECRET)) {
+      return res.status(403).json({ error: "Invalid signature" });
     }
 
     deploy(project);
