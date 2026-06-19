@@ -1,7 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
-require('dotenv').config();
 
 const app = express();
 const PORT = 4000;
