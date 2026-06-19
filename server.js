@@ -28,19 +28,12 @@ app.use((req, res, next) => {
 });
 
 function deploy(project) {
-  const path = "/home/kikchan/Metalforce/" + project;
+  console.log(`[DEPLOY] ${project}`);
 
-  if (!path) {
-    throw new Error("Unknown project: " + project);
-  }
-
-  console.log(`[DEPLOY] ${project} -> ${path}`);
-
-  execSync("git restore .", { cwd: path, stdio: "inherit" });
-  execSync("git pull", { cwd: path, stdio: "inherit" });
-  execSync("docker compose up -d --build", { cwd: path, stdio: "inherit" });
-
-  console.log(`[DONE] ${project}`);
+  execSync(
+    `ssh deploy@localhost "sudo /usr/local/bin/deploy-project.sh ${project}"`,
+    { stdio: "inherit" }
+  );
 }
 
 function verifyGitHubSignature(req) {
