@@ -28,10 +28,6 @@ app.use((req, res, next) => {
 });
 
 function deploy(project) {
-  if (!verifyGitHubSignature(req)) {
-    return res.status(403).json({ error: "Invalid signature" });
-  }
-
   const path = "/home/kikchan/Metalforce/" + project;
 
   if (!path) {
@@ -77,7 +73,7 @@ app.post('/deploy', (req, res) => {
       return res.status(400).json({ error: "Missing ?project=" });
     }
 
-    if (!verifyGitHubSignature(req, SECRET)) {
+    if (!verifyGitHubSignature(req)) {
       return res.status(403).json({ error: "Invalid signature" });
     }
 
