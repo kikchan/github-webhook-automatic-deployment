@@ -24,20 +24,21 @@ function verifySignature(req) {
   const signature = req.headers['x-hub-signature-256'];
   if (!signature || !req.body) return false;
 
+  // IMPORTANT: raw Buffer, no conversion
   const hmac = crypto.createHmac('sha256', SECRET);
   const digest = hmac.update(req.body).digest('hex');
 
-  // GitHub sends: "sha256=..."
   const expected = signature.split('=')[1];
 
   if (!expected) return false;
 
+  // convert both hex strings into buffers
   const digestBuf = Buffer.from(digest, 'hex');
-  const sigBuf = Buffer.from(expected, 'hex');
+  const expectedBuf = Buffer.from(expected, 'hex');
 
-  if (sigBuf.length !== digestBuf.length) return false;
+  if (digestBuf.length !== expectedBuf.length) return false;
 
-  return crypto.timingSafeEqual(sigBuf, digestBuf);
+  return crypto.timingSafeEqual(digestBuf, expectedBuf);
 }
 
 /**
