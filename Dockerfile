@@ -7,8 +7,9 @@ RUN npm install
 RUN apk add --no-cache git openssh-client
 
 RUN git config --global --add safe.directory '*'
-RUN mkdir -p /root/.ssh && \
-    echo "Host github.com\n\tStrictHostKeyChecking no\n" > /root/.ssh/config
+RUN apk add --no-cache git openssh-client && \
+    mkdir -p /root/.ssh && \
+    ssh-keyscan github.com >> /root/.ssh/known_hosts
 
 COPY . .
 
