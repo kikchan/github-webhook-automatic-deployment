@@ -7,5 +7,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /home:/home
+      - /home/kikchan/.ssh:/root/.ssh:ro
     env_file:
       - .env
