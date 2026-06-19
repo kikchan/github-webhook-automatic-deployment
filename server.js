@@ -4,6 +4,7 @@ const crypto = require('crypto');
 require('dotenv').config();
 
 const SECRET = process.env.SECRET_TOKEN;
+const PORT = process.env.PORT || 4000;
 
 const app = express();
 app.use((req, res, next) => {
@@ -26,14 +27,11 @@ app.use((req, res, next) => {
   });
 });
 
-const SECRET = process.env.SECRET_TOKEN;
-const PORT = process.env.PORT || 4000;
-
 function deploy(project) {
   if (!verifyGitHubSignature(req)) {
     return res.status(403).json({ error: "Invalid signature" });
   }
-  
+
   const path = "/home/kikchan/Metalforce/" + project;
 
   if (!path) {
