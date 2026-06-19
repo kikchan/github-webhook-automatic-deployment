@@ -32,7 +32,7 @@ function deploy(project) {
 app.post('/deploy', (req, res) => {
   try {
     const project = req.query.project;
-    const secret = req.query.secret;
+    const secret = req.body.config.secret;
 
     if (!project) {
       return res.status(400).json({ error: "Missing ?project=" });
