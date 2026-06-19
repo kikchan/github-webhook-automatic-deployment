@@ -6,18 +6,20 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const SECRET = process.env.SECRET_TOKEN;
 
-app.use(express.json({
-  verify: (req, res, buf) => {
-    req.rawBody = buf.toString();
-  }
-}));
+app.use(express.raw({ type: '*/*' }));
+
+function getRawBody(req) {
+  return req.body.toString('utf8');
+}
 
 function verify(req) {
   const sig = req.headers['x-hub-signature-256'];
-  if (!sig || !req.rawBody) return false;
+  if (!sig || !req.body) return false;
+
+  const rawBody = req.body.toString('utf8');
 
   const hmac = crypto.createHmac('sha256', SECRET);
-  const digest = 'sha256=' + hmac.update(req.rawBody).digest('hex');
+  const digest = 'sha256=' + hmac.update(rawBody).digest('hex');
 
   return crypto.timingSafeEqual(
     Buffer.from(sig),
