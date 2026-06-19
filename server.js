@@ -12,38 +12,31 @@ if (!SECRET) {
 
 /**
  * IMPORTANT:
- * GitHub signs RAW request body bytes.
- * We must preserve Buffer exactly.
+ * Capture RAW BODY as STRING EXACTLY ONCE
  */
 app.use('/deploy', express.raw({ type: '*/*' }));
 
-/**
- * GitHub signature verification (equivalent to Ruby secure_compare version)
- */
 function verifySignature(req) {
   const signature = req.headers['x-hub-signature-256'];
   if (!signature || !req.body) return false;
 
-  // IMPORTANT: raw Buffer, no conversion
+  // Convert Buffer -> string ONCE (GitHub signs this exact UTF-8 string)
+  const payload = req.body.toString('utf8');
+
   const hmac = crypto.createHmac('sha256', SECRET);
-  const digest = hmac.update(req.body).digest('hex');
+  const digest = hmac.update(payload, 'utf8').digest('hex');
 
   const expected = signature.split('=')[1];
 
   if (!expected) return false;
 
-  // convert both hex strings into buffers
-  const digestBuf = Buffer.from(digest, 'hex');
-  const expectedBuf = Buffer.from(expected, 'hex');
-
-  if (digestBuf.length !== expectedBuf.length) return false;
-
-  return crypto.timingSafeEqual(digestBuf, expectedBuf);
+  // DIRECT STRING COMPARISON (THIS IS THE KEY FIX)
+  return crypto.timingSafeEqual(
+    Buffer.from(digest, 'utf8'),
+    Buffer.from(expected, 'utf8')
+  );
 }
 
-/**
- * Deploy logic
- */
 function deploy(project) {
   console.log(`[DEPLOY] ${project}`);
 
@@ -54,39 +47,24 @@ function deploy(project) {
   console.log(`[DONE] ${project}`);
 }
 
-/**
- * Webhook endpoint
- */
 app.post('/deploy', (req, res) => {
-  try {
-    const project = req.query.project;
+  const project = req.query.project;
 
-    if (!project) {
-      return res.status(400).json({ error: 'Missing project' });
-    }
-
-    // GitHub ping event (no signature required)
-    if (req.headers['x-github-event'] === 'ping') {
-      return res.json({ ok: true });
-    }
-
-    // SECURITY CHECK
-    if (!verifySignature(req)) {
-      return res.status(403).json({ error: 'Invalid signature' });
-    }
-
-    deploy(project);
-
-    return res.json({ ok: true, deployed: project });
-
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: err.message });
+  if (!project) {
+    return res.status(400).json({ error: 'Missing project' });
   }
-});
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+  if (req.headers['x-github-event'] === 'ping') {
+    return res.json({ ok: true });
+  }
+
+  if (!verifySignature(req)) {
+    return res.status(403).json({ error: 'Invalid signature' });
+  }
+
+  deploy(project);
+
+  res.json({ ok: true, deployed: project });
 });
 
 app.listen(PORT, () => {
