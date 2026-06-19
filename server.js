@@ -30,10 +30,9 @@ app.use((req, res, next) => {
 function deploy(project) {
   console.log(`[DEPLOY] ${project}`);
 
-  execSync(
-    `ssh deploy@localhost "sudo /usr/local/bin/deploy-project.sh ${project}"`,
-    { stdio: "inherit" }
-  );
+  execSync(`cd /home/kikchan/Metalforce/${project} && git pull && docker compose up -d --build`, {
+    stdio: "inherit"
+  });
 }
 
 function verifyGitHubSignature(req) {
